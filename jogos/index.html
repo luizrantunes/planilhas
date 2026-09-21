@@ -827,7 +827,8 @@ function render(){
   const first = G.reduce(function(a,g){ return g.t < a.t ? g : a; },G[0]), last = G.reduce(function(a,g){ return g.t > a.t ? g : a; },G[0]);
   $('#sub').textContent = fInt(G.length)+' jogos terminados, de '+mesAno(first.y,first.m)+' a '+mesAno(last.y,last.m)+'.';
   const sn = $('#srcnote');
-  if (SAVED){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b>, carregada em '+fmtDate(SAVED.at.slice(0,10))+'. <button class="ghost" data-restore="1">Voltar aos dados originais</button>'; }
+  if (SAVED && SAVED.repo){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b> fixada no GitHub'+(SAVED.at ? ', publicada em '+fmtDate(SAVED.at.slice(0,10)) : '')+'.'; }
+  else if (SAVED){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b>, carregada em '+fmtDate(SAVED.at.slice(0,10))+'. <button class="ghost" data-restore="1">Voltar aos dados originais</button>'; }
   else { sn.hidden = true; sn.innerHTML = ''; }
   killCharts();
   $$('[role=tabpanel]').forEach(function(p){ p.hidden = p.id !== 'tab-'+S.tab; });
@@ -1006,6 +1007,37 @@ if (window.XLSX){
   });
 }
 
+/* ---------- planilha fixada no GitHub ---------- */
+// Se existir uma dessas planilhas na mesma pasta desta página, ela vira a fonte dos dados.
+// Para atualizar o site basta trocar o arquivo no repositório, sem mexer no código.
+const REPO_FILES = ['Lista de Jogos Finalizados.xlsx','planilha.xlsx'];
+function localISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fetchRepoSheet(i){
+  if (i >= REPO_FILES.length) return Promise.resolve(null);
+  return fetch(encodeURIComponent(REPO_FILES[i]),{cache:'no-cache'}).then(function(resp){
+    if (!resp.ok) return fetchRepoSheet(i+1);
+    const lm = resp.headers.get('Last-Modified');
+    return resp.arrayBuffer().then(function(buf){ return {name:REPO_FILES[i],buf:buf,lm:lm}; });
+  });
+}
+function loadRepoSheet(){
+  if (!window.XLSX || !window.fetch || location.protocol === 'file:') return;
+  fetchRepoSheet(0).then(function(o){
+    if (!o) return;
+    try{
+      const res = parseSheet(XLSX.read(new Uint8Array(o.buf),{type:'array'}));
+      if (!res.rows.length) throw new Error('Nenhum jogo encontrado na planilha.');
+      res.rows.sort(function(a,b){ return b[0]-a[0]; });
+      G = build(res.rows); yearsRange(); fillSelects(); resetFilters();
+      const d = o.lm ? new Date(o.lm) : null;
+      SAVED = {name:o.name,at:(d && !isNaN(d)) ? localISO(d) : '',rows:res.rows,repo:true};
+      clearSaved();
+      $('#upl').hidden = true; $('#upl').style.display = 'none';
+      render();
+    }catch(err){ toast('Achei '+o.name+' no GitHub, mas não consegui ler: '+(err.message || 'formato inesperado.')); }
+  }).catch(function(){ /* sem arquivo no repositório: segue com os dados que já estão na página */ });
+}
+
 (function(){
   let m = 'auto';
   try{ m = localStorage.getItem(THEME_KEY) || 'auto'; }catch(e){}
@@ -1013,6 +1045,7 @@ if (window.XLSX){
 })();
 fillSelects();
 render();
+loadRepoSheet();
 })();
 </script>
 </body>
