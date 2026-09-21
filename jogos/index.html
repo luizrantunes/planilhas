@@ -828,7 +828,7 @@ function render(){
   $('#sub').textContent = fInt(G.length)+' jogos terminados, de '+mesAno(first.y,first.m)+' a '+mesAno(last.y,last.m)+'.';
   const sn = $('#srcnote');
   if (SAVED && SAVED.repo){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b> fixada no GitHub'+(SAVED.at ? ', publicada em '+fmtDate(SAVED.at.slice(0,10)) : '')+'.'; }
-  else if (SAVED){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b>, carregada em '+fmtDate(SAVED.at.slice(0,10))+'. <button class="ghost" data-restore="1">Voltar aos dados originais</button>'; }
+  else if (SAVED){ sn.hidden = false; sn.innerHTML = 'Mostrando a planilha <b>'+esc(SAVED.name)+'</b>, carregada em '+fmtDate(SAVED.at.slice(0,10))+'. <button class="ghost" data-restore="1">Voltar à versão publicada</button>'; }
   else { sn.hidden = true; sn.innerHTML = ''; }
   killCharts();
   $$('[role=tabpanel]').forEach(function(p){ p.hidden = p.id !== 'tab-'+S.tab; });
@@ -883,7 +883,7 @@ $('#clear').addEventListener('click',function(){ resetFilters(); render(); });
 $('#srcnote').addEventListener('click',function(e){
   if (!e.target.closest('[data-restore]')) return;
   clearSaved(); SAVED = null; G = build(RAW); yearsRange(); fillSelects(); resetFilters(); render();
-  toast('Voltei aos dados originais desta página.');
+  toast('Voltei à versão publicada do site.'); loadRepoSheet();
 });
 $('#tags').addEventListener('click',function(e){
   const b = e.target.closest('[data-rm]'); if (!b) return;
@@ -990,6 +990,7 @@ if (window.XLSX){
     const f = e.target.files && e.target.files[0]; if (!f) return;
     const rd = new FileReader();
     rd.onload = function(){
+      const buf = rd.result;
       try{
         const res = parseSheet(XLSX.read(new Uint8Array(rd.result),{type:'array'}));
         if (!res.rows.length) throw new Error('Nenhum jogo encontrado na planilha.');
@@ -999,6 +1000,7 @@ if (window.XLSX){
         const ok = saveRows(res.rows,f.name);
         render();
         toast(fInt(G.length)+' jogos carregados de '+f.name+(res.skipped ? ' ('+res.skipped+' sem data válida foram ignorados)' : '')+'. '+(ok ? 'Fica salvo neste navegador.' : 'Não consegui salvar no navegador, então vale só nesta visita.'));
+        setTimeout(function(){ publishToGitHub(buf); },60);
       }catch(err){ toast(err.message || 'Não consegui ler essa planilha.'); }
       e.target.value = '';
     };
@@ -1008,9 +1010,12 @@ if (window.XLSX){
 }
 
 /* ---------- planilha fixada no GitHub ---------- */
-// Se existir uma dessas planilhas na mesma pasta desta página, ela vira a fonte dos dados.
-// Para atualizar o site basta trocar o arquivo no repositório, sem mexer no código.
+// Se existir uma dessas planilhas na mesma pasta desta página, ela é a versão publicada para todo mundo.
+// O botão "Atualizar com nova planilha" mostra a planilha aqui na hora e também a grava no repositório
+// (com o token do GitHub informado pelo usuário), para todos os visitantes verem depois do deploy.
 const REPO_FILES = ['Lista de Jogos Finalizados.xlsx','planilha.xlsx'];
+const GH = {owner:'luizrantunes', repo:'planilhas', dir:'jogos'};
+const GH_TOKEN_KEY = 'planilhas:gh-token';
 function localISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fetchRepoSheet(i){
   if (i >= REPO_FILES.length) return Promise.resolve(null);
@@ -1024,6 +1029,9 @@ function loadRepoSheet(){
   if (!window.XLSX || !window.fetch || location.protocol === 'file:') return;
   fetchRepoSheet(0).then(function(o){
     if (!o) return;
+    const lmT = o.lm ? Date.parse(o.lm) : NaN;
+    // envio feito neste navegador depois da última publicação: continua valendo até o deploy chegar
+    if (SAVED && !SAVED.repo && !isNaN(lmT) && Date.parse(SAVED.at) > lmT) return;
     try{
       const res = parseSheet(XLSX.read(new Uint8Array(o.buf),{type:'array'}));
       if (!res.rows.length) throw new Error('Nenhum jogo encontrado na planilha.');
@@ -1032,10 +1040,58 @@ function loadRepoSheet(){
       const d = o.lm ? new Date(o.lm) : null;
       SAVED = {name:o.name,at:(d && !isNaN(d)) ? localISO(d) : '',rows:res.rows,repo:true};
       clearSaved();
-      $('#upl').hidden = true; $('#upl').style.display = 'none';
       render();
     }catch(err){ toast('Achei '+o.name+' no GitHub, mas não consegui ler: '+(err.message || 'formato inesperado.')); }
   }).catch(function(){ /* sem arquivo no repositório: segue com os dados que já estão na página */ });
+}
+function b64(buf){
+  const u = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null,u.subarray(i,i+0x8000));
+  return btoa(s);
+}
+function ghFail(status,msg){ const e = new Error(msg || ''); e.status = status; return e; }
+function publishToGitHub(buf){
+  let token = '', fresh = false;
+  try{ token = localStorage.getItem(GH_TOKEN_KEY) || ''; }catch(e){}
+  if (!token){
+    token = (window.prompt('Para publicar esta planilha para todo mundo, cole aqui o seu token do GitHub (permissão Contents: Read and write, só no repositório '+GH.repo+'). Ele fica guardado só neste navegador. Deixe em branco para ver a planilha só aqui.') || '').trim();
+    if (!token){ toast('Planilha carregada só neste navegador. Para publicar para todos, informe o token do GitHub.'); return; }
+    fresh = true;
+  }
+  const url = 'https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.dir+'/'+encodeURIComponent(REPO_FILES[0]);
+  const head = {'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  function getSha(){
+    return fetch(url,{headers:head,cache:'no-store'}).then(function(r){
+      if (r.status === 200) return r.json().then(function(j){ return j.sha || null; });
+      if (r.status === 404) return null;
+      return r.json().catch(function(){ return {}; }).then(function(j){ throw ghFail(r.status,j.message); });
+    });
+  }
+  function put(sha){
+    const body = {message:'Atualiza '+REPO_FILES[0]+' pelo site',content:b64(buf)};
+    if (sha) body.sha = sha;
+    return fetch(url,{method:'PUT',headers:Object.assign({'Content-Type':'application/json'},head),body:JSON.stringify(body)}).then(function(r){
+      if (r.ok) return true;
+      return r.json().catch(function(){ return {}; }).then(function(j){ throw ghFail(r.status,j.message); });
+    });
+  }
+  toast('Enviando para o GitHub...');
+  getSha().then(put).catch(function(err){
+    if (err.status === 409 || err.status === 422) return getSha().then(put); // o arquivo mudou no meio do caminho: tenta mais uma vez
+    throw err;
+  }).then(function(){
+    if (fresh){ try{ localStorage.setItem(GH_TOKEN_KEY,token); }catch(e){} }
+    toast('Publicado no GitHub. Em 1 a 2 minutos todo mundo vê a planilha nova.');
+  }).catch(function(err){
+    if (err.status === 401){
+      try{ localStorage.removeItem(GH_TOKEN_KEY); }catch(e){}
+      toast('O GitHub recusou o token (inválido ou vencido). Gere outro e envie a planilha de novo.');
+    }else if (err.status === 403 || err.status === 404){
+      toast('O token não tem permissão para gravar no repositório '+GH.repo+'. Confira se ele tem Contents: Read and write nesse repositório.');
+    }else{
+      toast('Não consegui publicar no GitHub'+(err.status ? ' ('+err.status+')' : ' (sem conexão?)')+'. A planilha vale só neste navegador por enquanto.');
+    }
+  });
 }
 
 (function(){
