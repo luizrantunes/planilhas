@@ -802,13 +802,13 @@ function fillSelects(){
   const opt = function(v,l){ return '<option value="'+esc(v)+'">'+esc(l)+'</option>'; };
   $('#y0').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
   $('#y1').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
-  const byFreq = function(key){ return Array.from(groupBy(G,function(g){ return g[key]; })).sort(function(a,b){ return b[1].length-a[1].length; }).map(function(e){ return e[0]; }); };
+  const byFreq = function(key){ return Array.from(groupBy(G,function(g){ return g[key]; })).sort(function(a,b){ return a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
   $('#fPlat').innerHTML = opt('','Todas')+byFreq('plat').map(function(p){ return opt(p,p); }).join('');
   $('#fOrig').innerHTML = opt('','Todas')+byFreq('orig').map(function(p){ return opt(p,p); }).join('');
   $('#fGen').innerHTML = opt('','Todos')+byFreq('gen').map(function(p){ return opt(p,p); }).join('');
   $('#fDif').innerHTML = opt('','Todas')+DIFS.filter(function(x){ return G.some(function(g){ return g.dif === x; }); }).map(function(p){ return opt(p,p); }).join('');
   let nn = opt('0','Qualquer'); for (let n = 11; n >= 1; n--) nn += opt(String(n),'Nota '+n);
-  const parc = Array.from(groupBy([].concat.apply([],G.map(function(g){ return g.com; })),function(x){ return x; })).sort(function(a,b){ return b[1].length-a[1].length; }).map(function(e){ return e[0]; });
+  const parc = Array.from(groupBy([].concat.apply([],G.map(function(g){ return g.com; })),function(x){ return x; })).sort(function(a,b){ return a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; });
   $('#fCom').innerHTML = opt('','Qualquer')+opt('sozinho','Sozinho')+(parc.length ? opt(CONJ,'Conjuntas') : '')+parc.map(function(x){ return opt(x,'Com '+x); }).join('');
   $('#fNota').innerHTML = nn;
   $('#compChips').innerHTML = COMPS.filter(function(c){ return G.some(function(g){ return g.comp === c; }); })

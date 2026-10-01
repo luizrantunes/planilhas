@@ -339,7 +339,7 @@ const TIPOS = ['Livro','HQ','Mangá'];
 const TIPO_PL = {'Livro':['livro','livros'],'HQ':['HQ','HQs'],'Mangá':['mangá','mangás']};
 const NOTA_LABEL = {5:'Perfeito',4.5:'Incrível',4:'Ótimo',3.5:'Bom',3:'Decente',2.5:'Fraco',2:'Ruim',1.5:'Péssimo',1:'Horrível'};
 const NOT_AUTHOR = new Set(['Vários']);
-const TAM = [{k:'p1',l:'Até 150 págs',lo:1,hi:150},{k:'p2',l:'151 a 300',lo:151,hi:300},{k:'p3',l:'301 a 500',lo:301,hi:500},{k:'p4',l:'Mais de 500',lo:501,hi:1e9}];
+const TAM = [{k:'p1',l:'Até 250 págs',lo:1,hi:250},{k:'p2',l:'251 a 500',lo:251,hi:500},{k:'p3',l:'501 a 750',lo:501,hi:750},{k:'p4',l:'751 a 1.000',lo:751,hi:1000},{k:'p5',l:'Mais de 1.000',lo:1001,hi:1e9}];
 const CONJ = '__conjuntas';
 const STACKS = {fmt:'Formato',tipo:'Tipo',comp:'Companhia',genero:'Gênero',pais:'País'};
 
@@ -983,15 +983,15 @@ function fillSelects(){
   const opt = function(v,l){ return '<option value="'+esc(v)+'">'+esc(l)+'</option>'; };
   $('#y0').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
   $('#y1').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
-  const byFreq = function(f){ return Array.from(groupBy(ALL,f)).filter(function(e){ return e[0] !== ''; }).sort(function(a,b){ return b[1].length-a[1].length || a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
+  const byFreq = function(f){ return Array.from(groupBy(ALL,f)).filter(function(e){ return e[0] !== ''; }).sort(function(a,b){ return a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
   $('#fGenero').innerHTML = opt('','Todos')+byFreq(function(g){ return g.genero; }).map(function(p){ return opt(p,p); }).join('');
   $('#fPais').innerHTML = opt('','Todos')+byFreq(function(g){ return g.pais; }).map(function(p){ return opt(p,p); }).join('');
   const comps = byFreq(function(g){ return g.comp; });
   $('#fComp').innerHTML = opt('','Qualquer')+(comps.indexOf('Sozinho') >= 0 ? opt('Sozinho','Sozinho') : '')
     +(comps.some(function(p){ return p !== 'Sozinho'; }) ? opt(CONJ,'Conjuntas') : '')
-    +comps.filter(function(p){ return p !== 'Sozinho'; }).map(function(p){ return opt(p,'Com '+p); }).join('');
+    +comps.filter(function(p){ return p !== 'Sozinho'; }).sort(function(a,b){ return (b === 'Diana')-(a === 'Diana'); }).map(function(p){ return opt(p,'Com '+p); }).join('');
   $('#fEd').innerHTML = opt('','Todas')+byFreq(function(g){ return g.ed; }).map(function(p){ return opt(p,p); }).join('');
-  $('#fTam').innerHTML = opt('','Qualquer')+TAM.map(function(t){ return opt(t.k,t.l); }).join('');
+  $('#fTam').innerHTML = opt('','Qualquer')+TAM.slice().reverse().map(function(t){ return opt(t.k,t.l); }).join('');
   let nn = opt('0','Qualquer'); [5,4.5,4,3.5,3,2.5,2,1.5,1].forEach(function(n){ nn += opt(String(n),'Nota '+fNota(n)+' ('+NOTA_LABEL[n]+')'); });
   $('#fNota').innerHTML = nn;
   $('#fmtChips').innerHTML = FMTS.filter(function(c){ return G.some(function(g){ return g.fmt === c; }); })
