@@ -433,7 +433,7 @@ const S = { q:'', y0:YMIN, y1:YMAX, ym:0, fmts:new Set(), tipos:new Set(), gener
 function passes(g,skip,dates){
   const sk = skip;
   const q = norm(S.q.trim());
-  if (q && g.nq.indexOf(q) < 0 && g.aq.indexOf(q) < 0 && g.xq.indexOf(q) < 0) return false;
+  if (q && !q.split(/\s+/).every(function(w){ return g.nq.indexOf(w) >= 0 || g.aq.indexOf(w) >= 0 || g.xq.indexOf(w) >= 0; })) return false;
   if (dates){
     if (!sk.has('year') && (g.y < S.y0 || g.y > S.y1)) return false;
     if (!sk.has('ym') && S.ym && g.y*100+g.m !== S.ym) return false;
@@ -741,7 +741,7 @@ function renderAnalises(el){
     + TIPOS.filter(function(t){ return d.some(function(g){ return g.tipo === t; }); }).map(function(t){ return cmpRow(t,d.filter(function(g){ return g.tipo === t; })); }).join('')
     + grp('Companhia de leitura')
     + (d.some(function(g){ return g.comp === 'Sozinho'; }) ? cmpRow('Sozinho',d.filter(function(g){ return g.comp === 'Sozinho'; })) : '')
-    + (comps.length > 1 ? cmpRow('Leituras conjuntas (todas)',d.filter(function(g){ return g.comp !== 'Sozinho'; })) : '')
+    + (comps.length > 1 ? cmpRow('Conjuntas',d.filter(function(g){ return g.comp !== 'Sozinho'; })) : '')
     + comps.map(function(c){ return cmpRow('Com '+esc(c),d.filter(function(g){ return g.comp === c; })); }).join('')
     + grp('Primeira leitura e releitura')
     + cmpRow('Primeira leitura',d.filter(function(g){ return !g.rel; }))
@@ -988,7 +988,7 @@ function fillSelects(){
   $('#fPais').innerHTML = opt('','Todos')+byFreq(function(g){ return g.pais; }).map(function(p){ return opt(p,p); }).join('');
   const comps = byFreq(function(g){ return g.comp; });
   $('#fComp').innerHTML = opt('','Qualquer')+(comps.indexOf('Sozinho') >= 0 ? opt('Sozinho','Sozinho') : '')
-    +(comps.some(function(p){ return p !== 'Sozinho'; }) ? opt(CONJ,'Leituras conjuntas (todas)') : '')
+    +(comps.some(function(p){ return p !== 'Sozinho'; }) ? opt(CONJ,'Conjuntas') : '')
     +comps.filter(function(p){ return p !== 'Sozinho'; }).map(function(p){ return opt(p,'Com '+p); }).join('');
   $('#fEd').innerHTML = opt('','Todas')+byFreq(function(g){ return g.ed; }).map(function(p){ return opt(p,p); }).join('');
   $('#fTam').innerHTML = opt('','Qualquer')+TAM.map(function(t){ return opt(t.k,t.l); }).join('');
@@ -1016,7 +1016,7 @@ function activeFilters(){
   if (S.tipos.size) a.push(['Tipo: '+Array.from(S.tipos).join(', '),function(){ S.tipos.clear(); }]);
   if (S.genero) a.push(['Gênero: '+S.genero,function(){ S.genero = ''; }]);
   if (S.pais) a.push(['País: '+S.pais,function(){ S.pais = ''; }]);
-  if (S.comp) a.push([S.comp === 'Sozinho' ? 'Lido sozinho' : (S.comp === CONJ ? 'Leituras conjuntas' : 'Com '+S.comp),function(){ S.comp = ''; }]);
+  if (S.comp) a.push([S.comp === 'Sozinho' ? 'Lido sozinho' : (S.comp === CONJ ? 'Conjuntas' : 'Com '+S.comp),function(){ S.comp = ''; }]);
   if (S.ed) a.push(['Editora: '+S.ed,function(){ S.ed = ''; }]);
   if (S.autor) a.push(['Autor: '+S.autor,function(){ S.autor = ''; }]);
   if (S.tam) a.push(['Tamanho: '+TAM.filter(function(t){ return t.k === S.tam; })[0].l,function(){ S.tam = ''; }]);
@@ -1083,8 +1083,9 @@ function cellTip(k){
 /* ---------- eventos ---------- */
 let qTimer = null;
 $('#q').addEventListener('input',function(e){ S.q = e.target.value; S.rows = 50; clearTimeout(qTimer); qTimer = setTimeout(render,140); });
-$('#y0').addEventListener('change',function(e){ S.y0 = +e.target.value; if (S.y1 < S.y0) S.y1 = S.y0; S.ym = 0; render(); });
-$('#y1').addEventListener('change',function(e){ S.y1 = +e.target.value; if (S.y0 > S.y1) S.y0 = S.y1; S.ym = 0; render(); });
+function fixYears(){ if (S.y0 > S.y1){ const t = S.y0; S.y0 = S.y1; S.y1 = t; } }
+$('#y0').addEventListener('change',function(e){ S.y0 = +e.target.value; fixYears(); S.ym = 0; render(); });
+$('#y1').addEventListener('change',function(e){ S.y1 = +e.target.value; fixYears(); S.ym = 0; render(); });
 [['fGenero','genero'],['fPais','pais'],['fComp','comp'],['fEd','ed'],['fTam','tam'],['fRel','rel']].forEach(function(p){
   $('#'+p[0]).addEventListener('change',function(e){ S[p[1]] = e.target.value; S.rows = 50; render(); });
 });
