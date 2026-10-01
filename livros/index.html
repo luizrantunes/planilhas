@@ -981,7 +981,7 @@ function renderLivros(el){
 function fillSelects(){
   const yrs = []; for (let y = YMAX; y >= YMIN; y--) yrs.push(y);
   const opt = function(v,l){ return '<option value="'+esc(v)+'">'+esc(l)+'</option>'; };
-  $('#y0').innerHTML = yrs.slice().reverse().map(function(y){ return opt(y,y); }).join('');
+  $('#y0').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
   $('#y1').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
   const byFreq = function(f){ return Array.from(groupBy(ALL,f)).filter(function(e){ return e[0] !== ''; }).sort(function(a,b){ return b[1].length-a[1].length || a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
   $('#fGenero').innerHTML = opt('','Todos')+byFreq(function(g){ return g.genero; }).map(function(p){ return opt(p,p); }).join('');
