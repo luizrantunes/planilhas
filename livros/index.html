@@ -290,6 +290,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     </div>
     <div class="row" id="row2" hidden>
       <span class="fld"><label for="fGenero">Gênero</label><select id="fGenero"></select></span>
+      <span class="fld"><label for="fCont">Continente</label><select id="fCont"></select></span>
       <span class="fld"><label for="fPais">País</label><select id="fPais"></select></span>
       <span class="fld"><label for="fComp">Companhia</label><select id="fComp"></select></span>
       <span class="fld"><label for="fEd">Editora</label><select id="fEd"></select></span>
@@ -341,7 +342,12 @@ const NOTA_LABEL = {5:'Perfeito',4.5:'Incrível',4:'Ótimo',3.5:'Bom',3:'Decente
 const NOT_AUTHOR = new Set(['Vários']);
 const TAM = [{k:'p1',l:'Até 250 págs',lo:1,hi:250},{k:'p2',l:'251 a 500',lo:251,hi:500},{k:'p3',l:'501 a 750',lo:501,hi:750},{k:'p4',l:'751 a 1.000',lo:751,hi:1000},{k:'p5',l:'Mais de 1.000',lo:1001,hi:1e9}];
 const CONJ = '__conjuntas';
-const STACKS = {fmt:'Formato',tipo:'Tipo',comp:'Companhia',genero:'Gênero',pais:'País'};
+const STACKS = {fmt:'Formato',tipo:'Tipo',comp:'Companhia',genero:'Gênero',pais:'País',cont:'Continente'};
+const CONTINENTES = ['África','América','Ásia','Europa','Oceania'];
+// País da planilha -> continente. Para um país novo que não esteja aqui, basta acrescentar o nome na lista certa.
+const PAISES_POR_CONTINENTE = {"Europa": ["Alemanha", "Áustria", "Bélgica", "Bulgária", "Croácia", "Dinamarca", "Escócia", "Eslováquia", "Eslovênia", "Espanha", "Estônia", "Finlândia", "França", "Gales", "Grécia", "Grécia Antiga", "Holanda", "Países Baixos", "Hungria", "Inglaterra", "Irlanda", "Irlanda do Norte", "Islândia", "Itália", "Letônia", "Lituânia", "Noruega", "Polônia", "Portugal", "Reino Unido", "República Tcheca", "Tchéquia", "Romênia", "Roma Antiga", "Rússia", "Sérvia", "Suécia", "Suíça", "Ucrânia", "Bósnia", "Albânia", "Belarus", "Bielorrússia", "Luxemburgo", "Malta", "Mônaco", "Vaticano", "União Soviética"], "América": ["Argentina", "Bolívia", "Brasil", "Canadá", "Chile", "Colômbia", "Costa Rica", "Cuba", "Equador", "El Salvador", "Estados Unidos", "EUA", "Guatemala", "Haiti", "Honduras", "Jamaica", "México", "Nicarágua", "Panamá", "Paraguai", "Peru", "Porto Rico", "República Dominicana", "Uruguai", "Venezuela", "Trinidad e Tobago"], "Ásia": ["Afeganistão", "Arábia Saudita", "Bangladesh", "Camboja", "China", "Coreia do Sul", "Coreia do Norte", "Coreia", "Emirados Árabes", "Filipinas", "Índia", "Indonésia", "Irã", "Iraque", "Israel", "Japão", "Jordânia", "Líbano", "Malásia", "Mongólia", "Nepal", "Paquistão", "Palestina", "Singapura", "Síria", "Sri Lanka", "Tailândia", "Taiwan", "Turquia", "Vietnã", "Cazaquistão", "Armênia", "Geórgia", "Tibete", "Pérsia"], "África": ["África do Sul", "Angola", "Argélia", "Cabo Verde", "Camarões", "Congo", "Costa do Marfim", "Egito", "Egito Antigo", "Etiópia", "Gana", "Guiné-Bissau", "Líbia", "Madagascar", "Marrocos", "Moçambique", "Nigéria", "Quênia", "Ruanda", "Senegal", "Somália", "Sudão", "Tanzânia", "Tunísia", "Uganda", "Zimbábue", "São Tomé e Príncipe"], "Oceania": ["Austrália", "Nova Zelândia", "Papua-Nova Guiné", "Fiji", "Samoa"]};
+const CONT_DE = (function(){ const m = {}; Object.keys(PAISES_POR_CONTINENTE).forEach(function(c){ PAISES_POR_CONTINENTE[c].forEach(function(p){ m[String(p).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()] = c; }); }); return m; })();
+function continente(p){ return CONT_DE[String(p || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()] || ''; }
 
 function norm(s){ return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function utcDay(iso){ return Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))/864e5; }
@@ -355,8 +361,8 @@ function build(rows){
     const autores = String(r[3]).split('|').map(function(a){ return a.trim(); }).filter(function(a){ return a && !NOT_AUTHOR.has(a); });
     const ti = ini ? utcDay(ini) : NaN, tf = fim ? utcDay(fim) : NaN;
     return {
-      id:+r[0]||0, raw:raw, name:name, nq:norm(name), aq:norm(r[3]), xq:norm([r[4],r[5],r[13]].join(' ')), tipo:r[1], autor:String(r[3]), autores:autores,
-      ed:String(r[4]), genero:String(r[5]), pais:String(r[13]),
+      id:+r[0]||0, raw:raw, name:name, nq:norm(name), aq:norm(r[3]), xq:norm([r[4],r[5],r[13],continente(r[13])].join(' ')), tipo:r[1], autor:String(r[3]), autores:autores,
+      ed:String(r[4]), genero:String(r[5]), pais:String(r[13]), cont:continente(r[13]),
       ini:ini, fim:fim, y:fim ? +fim.slice(0,4) : 0, m:fim ? +fim.slice(5,7) : 0, ti:ti, t:tf,
       dias:(fim && ini && tf >= ti) ? tf-ti+1 : 0,
       fmt:r[8], pag:+r[9] > 0 ? +r[9] : 0, nota:+r[10] > 0 ? +r[10] : 0,
@@ -427,7 +433,7 @@ function yearsRange(){
   YMAX = ys.length ? Math.max.apply(null,ys) : YMIN;
 }
 yearsRange();
-const S = { q:'', y0:YMIN, y1:YMAX, ym:0, fmts:new Set(), tipos:new Set(), genero:'', pais:'', comp:'', ed:'', autor:'', tam:'', rel:'', nota:0,
+const S = { q:'', y0:YMIN, y1:YMAX, ym:0, fmts:new Set(), tipos:new Set(), genero:'', pais:'', cont:'', comp:'', ed:'', autor:'', tam:'', rel:'', nota:0,
             tab:'livros', sortK:'fim', sortD:-1, rows:50, rankYear:'all', rankN:20, stack:'fmt', minAutor:5 };
 
 function passes(g,skip,dates){
@@ -442,6 +448,7 @@ function passes(g,skip,dates){
   if (!sk.has('tipo') && S.tipos.size && !S.tipos.has(g.tipo)) return false;
   if (!sk.has('genero') && S.genero && g.genero !== S.genero) return false;
   if (!sk.has('pais') && S.pais && g.pais !== S.pais) return false;
+  if (!sk.has('cont') && S.cont && g.cont !== S.cont) return false;
   if (!sk.has('comp') && S.comp && (S.comp === CONJ ? g.comp === 'Sozinho' : g.comp !== S.comp)) return false;
   if (!sk.has('ed') && S.ed && g.ed !== S.ed) return false;
   if (!sk.has('autor') && S.autor && g.autores.indexOf(S.autor) < 0) return false;
@@ -613,7 +620,8 @@ function renderPanorama(el){
     +   '<div class="panel"><h2>Tipo</h2><p class="hint">Livro, HQ ou mangá. Clique para filtrar.</p><div id="lTipo"></div></div>'
     +   '<div class="panel"><h2>Companhia de leitura</h2><p class="hint">Lidos sozinho ou em leitura conjunta. Clique para filtrar.</p><div id="lComp"></div></div>'
     + '</div>'
-    + '<div class="g2">'
+    + '<div class="g3">'
+    +   '<div class="panel"><h2>Continentes</h2><p class="hint">Pela origem do autor. Clique para filtrar.</p><div id="lCont"></div></div>'
     +   '<div class="panel"><h2>Tamanho</h2><p class="hint">Número de páginas. Clique para filtrar.</p><div id="lTam"></div></div>'
     +   '<div class="panel"><h2>Primeira leitura ou releitura</h2><p class="hint">Nomes marcados com (1) na planilha contam como releitura.</p><div id="lRel"></div></div>'
     + '</div>'
@@ -645,6 +653,9 @@ function renderPanorama(el){
   $('#lGenero').innerHTML = barRows(listItems(groupBy(dGenero,function(g){ return g.genero; }),12,S.genero),{facet:'genero',wide:true});
   const dPais = getData(['pais']);
   $('#lPais').innerHTML = barRows(listItems(groupBy(dPais,function(g){ return g.pais; }),12,S.pais),{facet:'pais',wide:true});
+  const dCt = getData(['cont']);
+  $('#lCont').innerHTML = barRows(withPct(CONTINENTES.map(function(c){ return {k:c,label:c,n:dCt.filter(function(g){ return g.cont === c; }).length,color:'var(--neutral)'}; }),dCt.length),{facet:'cont',cons:true})
+    + (function(){ const sem = Array.from(new Set(dCt.filter(function(g){ return g.pais && !g.cont; }).map(function(g){ return g.pais; }))); return sem.length ? '<p class="note">Sem continente definido: '+esc(sem.join(', '))+'.</p>' : ''; })();
   const dTa = getData(['tam']);
   $('#lTam').innerHTML = barRows(TAM.map(function(t){ return {k:t.k,label:t.l,n:dTa.filter(function(g){ return g.pag >= t.lo && g.pag <= t.hi; }).length,color:'var(--neutral)'}; }),{facet:'tam'});
   const dR = getData(['rel']);
@@ -743,6 +754,8 @@ function renderAnalises(el){
     + (d.some(function(g){ return g.comp === 'Sozinho'; }) ? cmpRow('Sozinho',d.filter(function(g){ return g.comp === 'Sozinho'; })) : '')
     + (comps.length > 1 ? cmpRow('Conjuntas',d.filter(function(g){ return g.comp !== 'Sozinho'; })) : '')
     + comps.map(function(c){ return cmpRow('Com '+esc(c),d.filter(function(g){ return g.comp === c; })); }).join('')
+    + grp('Continente')
+    + CONTINENTES.filter(function(c){ return d.some(function(g){ return g.cont === c; }); }).map(function(c){ return cmpRow(c,d.filter(function(g){ return g.cont === c; })); }).join('')
     + grp('Primeira leitura e releitura')
     + cmpRow('Primeira leitura',d.filter(function(g){ return !g.rel; }))
     + (d.some(function(g){ return g.rel; }) ? cmpRow('Releitura',d.filter(function(g){ return g.rel; })) : '')
@@ -768,7 +781,7 @@ function renderAnalises(el){
     +   '<div class="panel"><h2>Em que mês do ano termino mais leituras</h2><p class="hint">Soma de todos os anos da seleção.</p><div class="cbox"><canvas id="cMes" role="img" aria-label="Leituras por mês do ano"></canvas></div></div>'
     + '</div>'
     + '<div class="g2 w">'
-    +   '<div class="panel"><h2>Comparações</h2><p class="hint">Como mudam a nota e o ritmo conforme formato, tipo, companhia e repetição.</p>'+cmpHTML+'</div>'
+    +   '<div class="panel"><h2>Comparações</h2><p class="hint">Como mudam a nota e o ritmo conforme formato, tipo, companhia, continente e repetição.</p>'+cmpHTML+'</div>'
     +   '<div class="panel"><h2>Sua nota e a da Diana</h2><p class="hint">Nas leituras conjuntas em que as duas notas foram dadas. A nota do painel é sempre a sua.</p>'+dianaHTML+'</div>'
     + '</div>'
     + missingNote(d,['nota','pag','dias'])
@@ -864,7 +877,8 @@ function facts(d){
   const pai = Array.from(groupBy(d,function(g){ return g.pais; })).sort(function(a,b){ return b[1].length-a[1].length; })[0];
   F(pai[0],'País mais frequente',pai[1].length+' '+plural(pai[1].length,'leitura','leituras')+' ('+pct(pai[1].length,n)+'%).');
   const nGen = new Set(d.map(function(g){ return g.genero; }).filter(Boolean)).size, nPai = new Set(d.map(function(g){ return g.pais; }).filter(Boolean)).size;
-  if (nPai > 1) F(nPai+' países','Volta ao mundo','Autores de '+nPai+' países diferentes nesta seleção.');
+  const nCo = new Set(d.map(function(g){ return g.cont; }).filter(Boolean)).size, faltam = CONTINENTES.filter(function(c){ return !d.some(function(g){ return g.cont === c; }); });
+  if (nPai > 1) F(nPai+' países','Volta ao mundo','Autores de '+nPai+' países diferentes, em '+nCo+' '+plural(nCo,'continente','continentes')+'.'+(faltam.length && faltam.length < 5 ? ' Ainda '+plural(faltam.length,'falta','faltam')+' '+faltam.join(' e ')+'.' : ''));
   if (nGen > 1) F(nGen+' gêneros','Variedade','Leituras espalhadas por '+nGen+' gêneros diferentes.');
   const gb = avgItems(groupBy(d,function(g){ return g.genero; }),5);
   const pb = avgItems(groupBy(d,function(g){ return g.pais; }),5);
@@ -985,6 +999,7 @@ function fillSelects(){
   $('#y1').innerHTML = yrs.map(function(y){ return opt(y,y); }).join('');
   const byFreq = function(f){ return Array.from(groupBy(ALL,f)).filter(function(e){ return e[0] !== ''; }).sort(function(a,b){ return a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
   $('#fGenero').innerHTML = opt('','Todos')+byFreq(function(g){ return g.genero; }).map(function(p){ return opt(p,p); }).join('');
+  $('#fCont').innerHTML = opt('','Todos')+CONTINENTES.map(function(c){ return opt(c,c); }).join('');
   $('#fPais').innerHTML = opt('','Todos')+byFreq(function(g){ return g.pais; }).map(function(p){ return opt(p,p); }).join('');
   const comps = byFreq(function(g){ return g.comp; });
   $('#fComp').innerHTML = opt('','Qualquer')+(comps.indexOf('Sozinho') >= 0 ? opt('Sozinho','Sozinho') : '')
@@ -1002,7 +1017,7 @@ function fillSelects(){
 function syncControls(){
   if ($('#q') !== document.activeElement) $('#q').value = S.q;
   $('#y0').value = S.y0; $('#y1').value = S.y1;
-  $('#fGenero').value = S.genero; $('#fPais').value = S.pais; $('#fComp').value = S.comp; $('#fEd').value = S.ed; $('#fTam').value = S.tam;
+  $('#fGenero').value = S.genero; $('#fPais').value = S.pais; $('#fCont').value = S.cont; $('#fComp').value = S.comp; $('#fEd').value = S.ed; $('#fTam').value = S.tam;
   $('#fNota').value = String(S.nota); $('#fRel').value = S.rel;
   $$('#fmtChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',S.fmts.has(b.dataset.fmt) ? 'true' : 'false'); });
   $$('#tipoChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',S.tipos.has(b.dataset.tipo) ? 'true' : 'false'); });
@@ -1015,6 +1030,7 @@ function activeFilters(){
   if (S.fmts.size) a.push(['Formato: '+Array.from(S.fmts).join(', '),function(){ S.fmts.clear(); }]);
   if (S.tipos.size) a.push(['Tipo: '+Array.from(S.tipos).join(', '),function(){ S.tipos.clear(); }]);
   if (S.genero) a.push(['Gênero: '+S.genero,function(){ S.genero = ''; }]);
+  if (S.cont) a.push(['Continente: '+S.cont,function(){ S.cont = ''; }]);
   if (S.pais) a.push(['País: '+S.pais,function(){ S.pais = ''; }]);
   if (S.comp) a.push([S.comp === 'Sozinho' ? 'Lido sozinho' : (S.comp === CONJ ? 'Conjuntas' : 'Com '+S.comp),function(){ S.comp = ''; }]);
   if (S.ed) a.push(['Editora: '+S.ed,function(){ S.ed = ''; }]);
@@ -1026,7 +1042,7 @@ function activeFilters(){
 }
 let activeList = [];
 function resetFilters(){
-  S.q = ''; S.y0 = YMIN; S.y1 = YMAX; S.ym = 0; S.fmts.clear(); S.tipos.clear(); S.genero = ''; S.pais = ''; S.comp = ''; S.ed = ''; S.autor = ''; S.tam = ''; S.rel = '';
+  S.q = ''; S.y0 = YMIN; S.y1 = YMAX; S.ym = 0; S.fmts.clear(); S.tipos.clear(); S.genero = ''; S.pais = ''; S.cont = ''; S.comp = ''; S.ed = ''; S.autor = ''; S.tam = ''; S.rel = '';
   S.nota = 0; S.rankYear = 'all'; S.rows = 50; S.rankN = 20;
 }
 
@@ -1086,7 +1102,7 @@ $('#q').addEventListener('input',function(e){ S.q = e.target.value; S.rows = 50;
 function fixYears(){ if (S.y0 > S.y1){ const t = S.y0; S.y0 = S.y1; S.y1 = t; } }
 $('#y0').addEventListener('change',function(e){ S.y0 = +e.target.value; fixYears(); S.ym = 0; render(); });
 $('#y1').addEventListener('change',function(e){ S.y1 = +e.target.value; fixYears(); S.ym = 0; render(); });
-[['fGenero','genero'],['fPais','pais'],['fComp','comp'],['fEd','ed'],['fTam','tam'],['fRel','rel']].forEach(function(p){
+[['fGenero','genero'],['fCont','cont'],['fPais','pais'],['fComp','comp'],['fEd','ed'],['fTam','tam'],['fRel','rel']].forEach(function(p){
   $('#'+p[0]).addEventListener('change',function(e){ S[p[1]] = e.target.value; S.rows = 50; render(); });
 });
 $('#fNota').addEventListener('change',function(e){ S.nota = +e.target.value; S.rows = 50; render(); });
