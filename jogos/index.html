@@ -267,6 +267,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       <span class="fld"><label for="fPlat">Plataforma</label><select id="fPlat"></select></span>
       <span class="fld"><label for="fOrig">Origem</label><select id="fOrig"></select></span>
       <span class="fld"><label for="fGen">Gênero</label><select id="fGen"></select></span>
+      <span class="fld"><label for="fFr">Franquia</label><select id="fFr"></select></span>
       <span class="fld"><label for="fDif">Dificuldade</label><select id="fDif"></select></span>
       <span class="fld"><label for="fNota">Nota</label><select id="fNota"></select></span>
       <span class="fld"><label for="fFull">100%</label><select id="fFull"><option value="">Todos</option><option value="sim">Com 100%</option><option value="nao">Sem 100%</option></select></span>
@@ -325,7 +326,59 @@ function company(p){
 }
 function norm(s){ return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 
+// Franquias: cada nome é comparado (sem acentos, em minúsculas) com estas regras, na ordem; vale a primeira que bater.
+// Só entram no site as franquias com pelo menos FRANQ_MIN títulos diferentes, então novas aparecem sozinhas quando chegarem lá.
+const FRANQ_MIN = 3;
+const FRANQUIAS = [
+  ['LEGO',/^lego\b/],
+  ['Pokémon',/pokemon/],
+  ['Yoshi',/yoshi/],
+  ['Mario',/\bmario\b|luigi/],
+  ['Donkey Kong',/donkey kong/],
+  ['The Legend of Zelda',/zelda/],
+  ['Metroid',/metroid/],
+  ['Kirby',/kirby/],
+  ['Fire Emblem',/fire emblem/],
+  ['Xenoblade Chronicles',/xenoblade/],
+  ['Final Fantasy',/final fantasy/],
+  ['Dragon Quest',/dragon quest/],
+  ['Dragon Ball',/dragon ball/],
+  ['God of War',/god of war/],
+  ['Grand Theft Auto',/grand theft auto/],
+  ['Guitar Hero',/guitar hero|band hero/],
+  ['Metal Slug',/metal slug/],
+  ['Castlevania',/castlevania/],
+  ['Resident Evil',/resident evil/],
+  ['Mortal Kombat',/mortal kombat/],
+  ['Street Fighter',/street fighter/],
+  ['Marvel vs. Capcom',/marvel vs/],
+  ['FIFA / EA Sports FC',/\bfifa\b|ea sports fc/],
+  ['Super Smash Bros.',/smash bros/],
+  ['Banjo-Kazooie',/banjo/],
+  ['Crash Bandicoot',/crash/],
+  ['Diablo',/diablo/],
+  ['Ben 10',/ben 10/],
+  ['Animal Crossing',/animal crossing/],
+  ['Hitman',/hitman/],
+  ['Tomb Raider',/tomb raider/],
+  ['The Walking Dead',/walking dead/],
+  ['Minecraft',/minecraft/],
+  ['Streets of Rage',/streets of rage/],
+  ['Suikoden',/suikoden/],
+  ['Show do Milhão',/show do milhao/],
+  ['Batman',/batman/],
+  ['Harry Potter',/harry potter/],
+  ['Sonic',/sonic/]
+];
+function franquiaDe(n){ const x = norm(n); for (let i = 0; i < FRANQUIAS.length; i++){ if (FRANQUIAS[i][1].test(x)) return FRANQUIAS[i][0]; } return ''; }
 function build(rows){
+  const list = buildRaw(rows);
+  const tit = {};
+  list.forEach(function(g){ if (g.frq){ (tit[g.frq] = tit[g.frq] || new Set()).add(g.nq); } });
+  list.forEach(function(g){ g.fr = (g.frq && tit[g.frq].size >= FRANQ_MIN) ? g.frq : ''; g.xq += ' '+norm(g.fr); });
+  return list;
+}
+function buildRaw(rows){
   return rows.map(function(r){
     const raw = String(r[1]);
     const rp = raw.match(/\((\d+)\)/);
@@ -337,7 +390,7 @@ function build(rows){
       date:r[5], y:y, m:m, t:Date.UTC(y,m-1,d)/864e5,
       secs:r[6], h:r[6]/3600, nota:r[7], dif:r[8], cond:r[9], full:!!r[10],
       pedro:/\[P\]/.test(raw), diana:/\[D\]/.test(raw), replay:rp ? +rp[1] : 0,
-      dlc:/^DLC\b/i.test(name), comp:company(r[2]), ocomp:company(r[3])
+      dlc:/^DLC\b/i.test(name), comp:company(r[2]), ocomp:company(r[3]), frq:franquiaDe(name)
     };
   });
 }
@@ -388,7 +441,7 @@ function dotHTML(comp){ return '<i class="dot" style="background:var('+CVAR[comp
 let YMIN = 0, YMAX = 0;
 function yearsRange(){ YMIN = Math.min.apply(null,G.map(function(g){ return g.y; })); YMAX = Math.max.apply(null,G.map(function(g){ return g.y; })); }
 yearsRange();
-const S = { q:'', y0:YMIN, y1:YMAX, ym:0, comps:new Set(), ocomps:new Set(), basis:'plat', plat:'', orig:'', gen:'', dif:'', nota:0, full:'', com:'', rep:'', tipo:'',
+const S = { q:'', y0:YMIN, y1:YMAX, ym:0, comps:new Set(), ocomps:new Set(), basis:'plat', plat:'', orig:'', gen:'', fr:'', dif:'', nota:0, full:'', com:'', rep:'', tipo:'',
             tab:'jogos', sortK:'date', sortD:-1, rows:50, rankYear:'all', rankN:20 };
 
 function getData(skip){
@@ -403,6 +456,7 @@ function getData(skip){
     if (!sk.has('plat') && S.plat && g.plat !== S.plat) return false;
     if (!sk.has('orig') && S.orig && g.orig !== S.orig) return false;
     if (!sk.has('gen') && S.gen && g.gen !== S.gen) return false;
+    if (!sk.has('fr') && S.fr && g.fr !== S.fr) return false;
     if (!sk.has('dif') && S.dif && g.dif !== S.dif) return false;
     if (S.nota && g.nota !== S.nota) return false;
     if (S.full && (S.full === 'sim') !== g.full) return false;
@@ -525,6 +579,10 @@ function renderPanorama(el){
     +   '<div class="panel"><h2>Origens</h2><p class="hint">De qual console o jogo é. Um jogo de PS2 jogado no PC conta em PS2 aqui e em PC em Plataformas. Clique para filtrar.</p><div id="lOrig"></div></div>'
     +   '<div class="panel"><h2>Gêneros</h2><p class="hint">Clique para filtrar.</p><div id="lGen"></div></div>'
     + '</div>'
+    + '<div class="g2">'
+    +   '<div class="panel"><h2>Franquias mais jogadas</h2><p class="hint">Jogos terminados de cada franquia com '+FRANQ_MIN+' títulos ou mais. Clique para filtrar.</p><div id="lFr"></div></div>'
+    +   '<div class="panel"><h2>Horas por franquia</h2><p class="hint">Soma do tempo registrado em cada franquia. Clique para filtrar.</p><div id="lFrH"></div></div>'
+    + '</div>'
     + (timedN < d.length ? '<p class="note">'+fInt(d.length-timedN)+' '+plural(d.length-timedN,'jogo está','jogos estão')+' sem tempo registrado e '+plural(d.length-timedN,'fica','ficam')+' de fora das horas e das médias de horas.</p>' : '')
     + '</div>';
 
@@ -549,6 +607,12 @@ function renderPanorama(el){
   const gl = Array.from(groupBy(dg,function(g){ return g.gen; })).map(function(e){ return {k:e[0],label:e[0],n:e[1].length,color:'var(--neutral)'}; }).sort(function(a,b){ return b.n-a.n; });
   $('#lGen').innerHTML = barRows(gl,{facet:'gen'});
 
+  const dfr = getData(['fr']).filter(function(g){ return g.fr; });
+  const frG = Array.from(groupBy(dfr,function(g){ return g.fr; }));
+  const frN = frG.map(function(e){ return {k:e[0],label:e[0],n:e[1].length,color:'var(--neutral)'}; }).sort(function(a,b){ return b.n-a.n || a.label.localeCompare(b.label,'pt-BR'); });
+  $('#lFr').innerHTML = frN.length ? barRows(frN,{facet:'fr',wide:true}) : '<p class="note">Nenhuma franquia nesta seleção.</p>';
+  const frH = frG.map(function(e){ const h = sum(e[1],function(g){ return g.secs; })/3600; return {k:e[0],label:e[0],n:h,txt:fInt(h)+' h',color:'var(--neutral)'}; }).filter(function(i){ return i.n > 0; }).sort(function(a,b){ return b.n-a.n; });
+  $('#lFrH').innerHTML = frH.length ? barRows(frH,{facet:'fr',wide:true}) : '<p class="note">Nenhuma franquia nesta seleção.</p>';
   // gráficos
   const years = []; for (let y = S.y0; y <= S.y1; y++) years.push(y);
   const byY = groupBy(d,function(g){ return g.y; });
@@ -598,6 +662,8 @@ function renderAnalises(el){
     .map(function(e){ return {label:e[0],n:e[1].length,v:avg(e[1],function(g){ return g.nota; }),color:'var('+CVAR[company(e[0])]+')'}; }).sort(function(a,b){ return b.v-a.v; });
   const genAvg = Array.from(groupBy(d,function(g){ return g.gen; })).filter(function(e){ return e[1].length >= 5; })
     .map(function(e){ return {label:e[0],n:e[1].length,v:avg(e[1],function(g){ return g.nota; }),color:'var(--neutral)'}; }).sort(function(a,b){ return b.v-a.v; });
+  const frAvg = Array.from(groupBy(d.filter(function(g){ return g.fr; }),function(g){ return g.fr; }))
+    .map(function(e){ return {label:e[0],n:e[1].length,v:avg(e[1],function(g){ return g.nota; }),color:'var(--neutral)'}; }).sort(function(a,b){ return b.v-a.v || b.n-a.n; });
   const avgRows = function(a){ return '<div class="blist">'+a.map(function(i){ return '<div class="brow wide"><span class="bl">'+esc(i.label)+'</span><span class="bt"><i style="width:'+(100*i.v/11).toFixed(1)+'%;background:'+i.color+'"></i></span><span class="bn">'+f1(i.v)+' <small>('+i.n+')</small></span></div>'; }).join('')+'</div>'; };
 
   const diff = d.filter(function(g){ return g.orig !== g.plat; });
@@ -622,9 +688,10 @@ function renderAnalises(el){
     +   '<div class="panel"><h2>Nota média por gênero</h2><p class="hint">Só gêneros com pelo menos 5 jogos.</p>'+(genAvg.length ? avgRows(genAvg) : '<p class="note">Sem gêneros com 5 jogos ou mais nesta seleção.</p>')+'</div>'
     + '</div>'
     + '<div class="g2">'
-    +   '<div class="panel"><h2>Em que mês do ano termino mais jogos</h2><p class="hint">Soma de todos os anos da seleção.</p><div class="cbox"><canvas id="cMes" role="img" aria-label="Jogos por mês do ano"></canvas></div></div>'
+    +   '<div class="panel"><h2>Nota média por franquia</h2><p class="hint">Franquias com '+FRANQ_MIN+' títulos ou mais. Entre parênteses, quantos jogos terminados.</p>'+(frAvg.length ? avgRows(frAvg) : '<p class="note">Nenhuma franquia nesta seleção.</p>')+'</div>'
     +   '<div class="panel"><h2>Jogados fora da plataforma original</h2><p class="hint">'+pct(diff.length,d.length)+'% dos jogos ('+fInt(diff.length)+') foram jogados num console diferente do original. Os mais comuns:</p>'+(pairs.length ? barRows(pairs,{wide:true}) : '<p class="note">Nenhum jogo nesta seleção.</p>')+'</div>'
     + '</div>'
+    + '<div class="panel"><h2>Em que mês do ano termino mais jogos</h2><p class="hint">Soma de todos os anos da seleção.</p><div class="cbox"><canvas id="cMes" role="img" aria-label="Jogos por mês do ano"></canvas></div></div>'
     + '<div class="panel"><h2>Companhia e repetição</h2><p class="hint">Como muda a nota e o tempo conforme com quem e quantas vezes o jogo foi terminado.</p><div class="tw"><table class="tbl small" style="min-width:420px"><thead><tr><th>Grupo</th><th>Jogos</th><th>Nota média</th><th>Horas por jogo</th></tr></thead><tbody>'
     +   groupStats('Sozinho',d.filter(function(g){ return !g.com.length; }))
     +   groupStats('Conjuntas',d.filter(function(g){ return g.com.length; }))
@@ -731,6 +798,13 @@ function facts(d){
   if (byD && byD[1].length > 1) F(byD[1].length+' jogos','Dia mais produtivo','Terminados no mesmo dia, em '+fmtDate(byD[0])+': '+byD[1].map(function(g){ return g.name; }).join(', ')+'.');
   const pcm = Array.from(groupBy([].concat.apply([],d.map(function(g){ return g.com; })),function(x){ return x; })).sort(function(a,b){ return b[1].length-a[1].length; })[0];
   if (pcm){ const lp = d.filter(function(g){ return g.com.indexOf(pcm[0]) >= 0; }); F(pcm[0],'Parceria mais frequente',lp.length+' '+plural(lp.length,'jogo terminado','jogos terminados')+' junto, com nota média '+f1(avg(lp,function(g){ return g.nota; }))+'.'); }
+  const frs = Array.from(groupBy(d.filter(function(g){ return g.fr; }),function(g){ return g.fr; }));
+  if (frs.length){
+    const fm = frs.slice().sort(function(a,b){ return b[1].length-a[1].length; })[0];
+    F(fm[0],'Franquia mais jogada',fm[1].length+' jogos terminados, '+new Set(fm[1].map(function(g){ return g.nq; })).size+' títulos diferentes e '+fInt(sum(fm[1],function(g){ return g.secs; })/3600)+' horas registradas.');
+    const fb = frs.filter(function(e){ return e[1].length >= FRANQ_MIN; }).map(function(e){ return [e[0],avg(e[1],function(g){ return g.nota; }),e[1].length]; }).sort(function(a,b){ return b[1]-a[1] || b[2]-a[2]; })[0];
+    if (fb && frs.length > 1) F(fb[0],'Franquia mais bem avaliada','Nota média '+f1(fb[1])+' em '+fb[2]+' jogos terminados.');
+  }
   const dl = d.filter(function(g){ return g.dlc; });
   if (dl.length) F(dl.length+' '+plural(dl.length,'DLC','DLCs'),'Expansões',dl.length+' '+plural(dl.length,'expansão foi contada','expansões foram contadas')+' como jogo terminado, com nota média '+f1(avg(dl,function(g){ return g.nota; }))+'.');
   return out;
@@ -805,6 +879,7 @@ function fillSelects(){
   const byFreq = function(key){ return Array.from(groupBy(G,function(g){ return g[key]; })).sort(function(a,b){ return a[0].localeCompare(b[0],'pt-BR'); }).map(function(e){ return e[0]; }); };
   $('#fPlat').innerHTML = opt('','Todas')+byFreq('plat').map(function(p){ return opt(p,p); }).join('');
   $('#fOrig').innerHTML = opt('','Todas')+byFreq('orig').map(function(p){ return opt(p,p); }).join('');
+  $('#fFr').innerHTML = opt('','Todas')+Array.from(new Set(G.map(function(g){ return g.fr; }).filter(Boolean))).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(p){ return opt(p,p); }).join('');
   $('#fGen').innerHTML = opt('','Todos')+byFreq('gen').map(function(p){ return opt(p,p); }).join('');
   $('#fDif').innerHTML = opt('','Todas')+DIFS.filter(function(x){ return G.some(function(g){ return g.dif === x; }); }).map(function(p){ return opt(p,p); }).join('');
   let nn = opt('0','Qualquer'); for (let n = 11; n >= 1; n--) nn += opt(String(n),'Nota '+n);
@@ -819,7 +894,7 @@ function fillSelects(){
 function syncControls(){
   if ($('#q') !== document.activeElement) $('#q').value = S.q;
   $('#y0').value = S.y0; $('#y1').value = S.y1;
-  $('#fPlat').value = S.plat; $('#fOrig').value = S.orig; $('#fGen').value = S.gen; $('#fDif').value = S.dif; $('#fNota').value = String(S.nota);
+  $('#fPlat').value = S.plat; $('#fOrig').value = S.orig; $('#fGen').value = S.gen; $('#fFr').value = S.fr; $('#fDif').value = S.dif; $('#fNota').value = String(S.nota);
   $('#fFull').value = S.full; $('#fCom').value = S.com; $('#fRep').value = S.rep; $('#fTipo').value = S.tipo;
   $$('#compChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',S.comps.has(b.dataset.comp) ? 'true' : 'false'); });
   $$('#ocompChips .chip').forEach(function(b){ b.setAttribute('aria-pressed',S.ocomps.has(b.dataset.ocomp) ? 'true' : 'false'); });
@@ -833,6 +908,7 @@ function activeFilters(){
   if (S.ocomps.size) a.push(['Console de origem: '+Array.from(S.ocomps).join(', '),function(){ S.ocomps.clear(); }]);
   if (S.plat) a.push(['Plataforma: '+S.plat,function(){ S.plat = ''; }]);
   if (S.orig) a.push(['Origem: '+S.orig,function(){ S.orig = ''; }]);
+  if (S.fr) a.push(['Franquia: '+S.fr,function(){ S.fr = ''; }]);
   if (S.gen) a.push(['Gênero: '+S.gen,function(){ S.gen = ''; }]);
   if (S.dif) a.push(['Dificuldade: '+S.dif,function(){ S.dif = ''; }]);
   if (S.nota) a.push(['Nota '+S.nota,function(){ S.nota = 0; }]);
@@ -844,7 +920,7 @@ function activeFilters(){
 }
 let activeList = [];
 function resetFilters(){
-  S.q = ''; S.y0 = YMIN; S.y1 = YMAX; S.ym = 0; S.comps.clear(); S.ocomps.clear(); S.plat = ''; S.orig = ''; S.gen = ''; S.dif = '';
+  S.q = ''; S.y0 = YMIN; S.y1 = YMAX; S.ym = 0; S.comps.clear(); S.ocomps.clear(); S.plat = ''; S.orig = ''; S.gen = ''; S.fr = ''; S.dif = '';
   S.nota = 0; S.full = ''; S.com = ''; S.rep = ''; S.tipo = ''; S.rankYear = 'all'; S.rows = 50; S.rankN = 20;
 }
 
@@ -895,7 +971,7 @@ $('#q').addEventListener('input',function(e){ S.q = e.target.value; S.rows = 50;
 function fixYears(){ if (S.y0 > S.y1){ const t = S.y0; S.y0 = S.y1; S.y1 = t; } }
 $('#y0').addEventListener('change',function(e){ S.y0 = +e.target.value; fixYears(); S.ym = 0; render(); });
 $('#y1').addEventListener('change',function(e){ S.y1 = +e.target.value; fixYears(); S.ym = 0; render(); });
-[['fPlat','plat'],['fOrig','orig'],['fGen','gen'],['fDif','dif'],['fFull','full'],['fCom','com'],['fRep','rep'],['fTipo','tipo']].forEach(function(p){
+[['fPlat','plat'],['fOrig','orig'],['fGen','gen'],['fFr','fr'],['fDif','dif'],['fFull','full'],['fCom','com'],['fRep','rep'],['fTipo','tipo']].forEach(function(p){
   $('#'+p[0]).addEventListener('change',function(e){ S[p[1]] = e.target.value; S.rows = 50; render(); });
 });
 $('#fNota').addEventListener('change',function(e){ S.nota = +e.target.value; S.rows = 50; render(); });
